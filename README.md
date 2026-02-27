@@ -97,6 +97,17 @@ Purpose: Receives HTTP request from UI Validates input Calls Service Layer Retur
 - Newtonsoft.Json 13.0.4
 - System.IO.Compression.ZipFile 4.3.0
 
+## 🔹 Required Tools & Accounts Overview
+
+| Component        | Version / Requirement        | Why We Are Using It |
+|-----------------|-----------------------------|---------------------|
+| .NET Runtime    | .NET 8.0 or higher          | Provides the execution environment for building and running modern applications (MVC, ASP.NET Core, Web API, Blazor). |
+| GitLeaks        | GitLeaks 8.30.0 (Windows)   | Used via a batch script to scan repositories for hardcoded secrets (API keys, connection strings, tokens)  |
+| AWS Account     | With Secrets Manager access | Stores and manages application secrets securely. Prevents hardcoding sensitive data in source code and enables centralized, encrypted secret management. |
+| Terraform CLI   | Version 1.0+                | Used to execute Terraform scripts to provision infrastructure and securely store secrets in AWS Secrets Manager. |
+
+
+
 ## Installation
 
 ### 1  GitLeaks Integration Setup Guide
