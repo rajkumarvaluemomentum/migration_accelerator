@@ -68,5 +68,5 @@ powershell -NoProfile -ExecutionPolicy Bypass ^
  -Complexity "%COMPLEXITY%"
 
 echo.
-echo ✅ Scan completed successfully
+echo Scan completed successfully
 pause
