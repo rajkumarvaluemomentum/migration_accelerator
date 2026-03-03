@@ -4,106 +4,22 @@
 The Migration Accelerator is an enterprise-grade web application designed to streamline and secure the migration of source code repositories from Team Foundation Server (TFS) to GitHub. It provides comprehensive assessment capabilities, automated secret detection, and detailed reporting to ensure safe and efficient migrations. 
 
 
-## Key Features
-
-**Infrastructure as Code (IaC) Automation**: Seamlessly create and manage Terraform-based infrastructure configurations for automated cloud deployments
-
-**Secrets Management Integration**: Secure credential management through AWS Secrets Manager with automatic injection into application pipeline
-
-**Repository Security Scanning**: Automated secret detection and vulnerability scanning using Gitleaks across GitHub repositories
-
-**GitHub Integration**: Direct integration with GitHub API for repository analysis, configuration retrieval, and automated workflows
-
-**Multi-Environment Support**: Segregate migration configurations across Development, Test, Staging, and Production environments
-
-**Background Processing**: Asynchronous Terraform execution and scheduled updates through hosted background services
-
-**Centralized Dashboard**: Web-based interface for viewing, managing, and orchestrating migration workflows
-
-## Use Cases
-
-**Accelerated Cloud Migrations**: Reduce migration timelines through automated infrastructure provisioning and configuration management
-
-**Infrastructure Standardization**: Enforce consistent infrastructure patterns across teams and environments using Infrastructure as Code
-
-**Secrets Governance**: Centralized credential management with audit trails and automated rotation capabilities
-
-**Security Compliance**: Automated scanning for exposed secrets and compliance violations before deployment
-
-**DevOps Automation**: Streamline deployment pipelines with integrated Terraform execution and GitHub workflows
-
-**Multi-Cloud Strategy**: Support complex migrations across multiple cloud environments with consistent tooling
-
-## Architecture
-
-<img width="348" height="183" alt="image" src="https://github.com/user-attachments/assets/55f97dcb-ff2d-41ac-86e5-bddccebe2236" />
-
-
-
-
-
-The platform consists of four core components:
-
-### 1. User Interface
-ASP.NET Core MVC application serving as the primary user interface for configuration management, testing, and migration orchestration. Built on .NET 8.0 with modern web standards.
-The entry point of the application.
-
-Purpose:
-
-- Allows users to interact with the system
-
-- Collects inputs (forms, clicks, filters)
-
-- Sends HTTP requests to the backend
-
-### 2. Service Layer (Services Directory)
-Business logic implementation for GitHub integration, AWS Secrets management, Terraform execution, and security scanning using established design patterns.
-
-### 3. Data Persistence (Data Directory & Models)
-Entity Framework Core integration with SQL Server for storing migration configurations, audit logs, and system state across environment lifecycles.
-
-### 4. Background Scheduler (TerraformBackgroundService)
-Asynchronous processing engine for long-running Terraform executions and automated configuration synchronization across environments.
-
-###  5. Controller
-
-The request handler and traffic manager.
-
-Purpose: Receives HTTP request from UI Validates input Calls Service Layer Returns appropriate response
-
 ## Technical Requirements
 
 <img width="562" height="250" alt="image" src="https://github.com/user-attachments/assets/6ef5f14f-9c73-49e5-b13b-822e470a3786" />
 
 
 
-### System Requirements
-- **.NET Runtime**: .NET 8.0 or higher
-- **GitLeaks**: GitLeaks 8.30.0 for Windows 
-- **Operating System**: Windows/Linux with .NET support
-- **Memory**: Minimum 2GB RAM recommended
-- **Storage**: Sufficient space for Terraform state files and logs
 
-### Cloud Requirements
-- **AWS Account**: For Secrets Manager access
-- **GitHub Account**: For repository integration
-- **Terraform CLI**: Version 1.0+ for infrastructure execution
 
-### Dependencies
-- Entity Framework Core 8.0.0
-- Microsoft.EntityFrameworkCore.SqlServer 8.0.0
-- AWS SDK for .NET (AWSSDK.SecretsManager 3.7.1.16)
-- SecretsScanner.Gitleaks 1.0.1
-- Newtonsoft.Json 13.0.4
-- System.IO.Compression.ZipFile 4.3.0
 
 ## 🔹 Required Tools & Accounts Overview
 
 | Component        | Version / Requirement        | Why We Are Using It |
 |-----------------|-----------------------------|---------------------|
-| .NET Runtime    | .NET 8.0 or higher          | Provides the execution environment for building and running modern applications (MVC, ASP.NET Core, Web API, Blazor). |
-| GitLeaks        | GitLeaks 8.30.0 (Windows)   | Used via a batch script to scan repositories for hardcoded secrets (API keys, connection strings, tokens)  |
-| AWS Account     | With Secrets Manager access | Stores and manages application secrets securely. Prevents hardcoding sensitive data in source code and enables centralized, encrypted secret management. |
+| .NET Runtime    | .NET 8.0 or higher          | Provides the execution environment for building and running modern applications  |
+| GitLeaks        | GitLeaks 8.30.0 (Windows)   | Used via a batch script to scan repositories for hardcoded secrets  |
+| AWS Account     | With Secrets Manager access | Stores and manages application secrets securely. |
 | Terraform CLI   | Version 1.0+                | Used to execute Terraform scripts to provision infrastructure and securely store secrets in AWS Secrets Manager. |
 
 
@@ -156,6 +72,81 @@ Ensure the following structure exists on your system:
 - ├── gitleaks.exe
 - ├── scan-repo.bat
 - └── repositories\
+
+### Configuration Script (scan-repo.bat)
+@echo off
+setlocal EnableDelayedExpansion
+
+REM ==============================
+REM CONFIGURATION
+REM ==============================
+set GITLEAKS_EXE=C:\Tools\gitleaks_8.30.0_windows_x64\gitleaks.exe
+set APP_ROOT=C:\Users\JadiRajKumar\OneDrive - ValueMomentum, Inc\Desktop\TFS_TO_GITGUB_MIGRATION_2026\migration_accelerator-master\migration_accelerator-master\migration_accelerator
+set SCAN_DIR=%APP_ROOT%\wwwroot\scan-results
+set DATA_DIR=%APP_ROOT%\wwwroot\data
+
+if not exist "%SCAN_DIR%" mkdir "%SCAN_DIR%"
+if not exist "%DATA_DIR%" mkdir "%DATA_DIR%"
+
+echo.
+set /p REPO_NAME=Enter Repo Name: 
+set REPO_PATH=%CD%
+
+echo --------------------------------
+echo Repo Name : %REPO_NAME%
+echo Repo Path : %REPO_PATH%
+echo --------------------------------
+
+REM ==============================
+REM RUN GITLEAKS
+REM ==============================
+"%GITLEAKS_EXE%" detect ^
+ --source "%REPO_PATH%" ^
+ --no-git ^
+ --report-format json ^
+ --report-path "%SCAN_DIR%\%REPO_NAME%.json" ^
+ --exit-code 0
+
+REM ==============================
+REM ADD METADATA TO REPORT
+REM ==============================
+powershell -NoProfile -ExecutionPolicy Bypass ^
+ -File "%DATA_DIR%\wrap-gitleaks-report.ps1" ^
+ -RepoName "%REPO_NAME%" ^
+ -ReportPath "%SCAN_DIR%\%REPO_NAME%.json"
+
+REM ==============================
+REM COUNT SECRETS
+REM ==============================
+for /f %%A in ('powershell -NoProfile -Command "(Get-Content '%SCAN_DIR%\%REPO_NAME%.json' | ConvertFrom-Json).findings.Count"') do set SECRET_COUNT=%%A
+
+REM ==============================
+REM CALCULATE REPO SIZE
+REM ==============================
+for /f %%A in ('powershell -NoProfile -Command ^
+  "[math]::Round((Get-ChildItem '%REPO_PATH%' -Recurse -File | Measure-Object Length -Sum).Sum / 1MB, 2)"') do set SIZE_MB=%%A
+
+REM ==============================
+REM COMPLEXITY LOGIC
+REM ==============================
+set COMPLEXITY=Easy
+if %SECRET_COUNT% GEQ 5 set COMPLEXITY=Medium
+if %SECRET_COUNT% GEQ 10 set COMPLEXITY=Hard
+
+REM ==============================
+REM UPDATE SUMMARY REPORT
+REM ==============================
+powershell -NoProfile -ExecutionPolicy Bypass ^
+ -File "%DATA_DIR%\update-migration-report.ps1" ^
+ -RepoName "%REPO_NAME%" ^
+ -RepoSizeMB "%SIZE_MB%" ^
+ -SensitiveCount %SECRET_COUNT% ^
+ -Complexity "%COMPLEXITY%"
+
+echo.
+echo Scan completed successfully
+pause
+
 
 ### 🔹 Application Result Storage
 
